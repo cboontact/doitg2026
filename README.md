@@ -162,116 +162,196 @@
 
 ```mermaid
 flowchart LR
-    U["ผู้ใช้งาน<br/>ผู้ดูแลระบบ / ครู / เจ้าหน้าที่ / นักเรียน / ผู้ปกครอง"]
-    F["ส่วนติดต่อผู้ใช้<br/>Next.js App Router"]
-    A["API ภายในระบบ<br/>/api/*"]
-    B["Business Logic<br/>src/lib"]
-    D["ฐานข้อมูลหลัก<br/>Cloudflare D1"]
+    U["ผู้ใช้งาน<br/>นักเรียน / ครู / เจ้าหน้าที่ / ผู้ดูแลระบบ / ผู้ปกครอง"]
+    F["Frontend<br/>Next.js App Router"]
+    A["API Layer<br/>Route Handlers /api/*"]
+    S["Service Layer<br/>Business Logic ใน src/lib"]
+    D[("Cloudflare D1<br/>ฐานข้อมูลหลัก")]
 
-    U --> F
-    F --> A
-    A --> B
-    B --> D
+    U <--> F
+    F <--> A
+    A <--> S
+    S <--> D
 ```
 
 ### 🧭 6.1.1 แผนภาพความสัมพันธ์เชิงแนวคิด
 
 ```mermaid
-flowchart TB
-    subgraph Actors["กลุ่มผู้ใช้งาน"]
-        Admin["ผู้ดูแลระบบ"]
-        Teacher["ครู"]
-        Staff["เจ้าหน้าที่"]
-        Student["นักเรียน"]
-        Parent["ผู้ปกครอง"]
-    end
+erDiagram
+    USERS {
+        text id PK
+        text username
+        text roles
+        text teacherId FK
+        text staffId
+    }
 
-    subgraph Core["ข้อมูลหลัก"]
-        Users["users"]
-        Teachers["teachers"]
-        Students["students"]
-        Years["academic_years"]
-        Holidays["special_holidays"]
-    end
+    TEACHERS {
+        text id PK
+        text userId FK
+        int grade
+        int room
+        int levelScope
+    }
 
-    subgraph Daily["งานประจำวัน"]
-        Attendance["attendance"]
-        Late["late_checkins"]
-        Leave["leave_requests"]
-        StudentLeave["student_leave_requests"]
-    end
+    TEACHER_DIRECTORY {
+        text id PK
+        text firstName
+        text lastName
+        text currentUserId FK
+        text currentTeacherId FK
+    }
 
-    subgraph Behavior["พฤติกรรมและการดูแล"]
-        BehaviorLogs["behavior_logs"]
-        ScoreRules["score_rules"]
-        SdqPeriods["sdq_periods"]
-        SdqAssessments["sdq_assessments"]
-        SdqAnswers["sdq_answers"]
-        SdqScores["sdq_scores"]
-    end
+    TEACHER_REGISTRATION_REQUESTS {
+        text id PK
+        text teacherDirectoryId FK
+        text username
+        text status
+        text createdUserId FK
+        text createdTeacherId FK
+    }
 
-    Admin --> Users
-    Admin --> Teachers
-    Admin --> Students
-    Admin --> Years
-    Admin --> Holidays
-    Admin --> ScoreRules
-    Admin --> SdqPeriods
+    STUDENTS {
+        text id PK
+        text studentId
+        text studentCardId
+        int grade
+        int room
+        int behaviorScore
+    }
 
-    Teacher --> Attendance
-    Teacher --> Leave
-    Teacher --> BehaviorLogs
-    Teacher --> SdqAssessments
+    ATTENDANCE {
+        text id PK
+        text studentId FK
+        text date
+        text status
+        text lateCheckInId FK
+    }
 
-    Staff --> Attendance
-    Staff --> Late
-    Staff --> Leave
-    Staff --> BehaviorLogs
+    LATE_CHECKINS {
+        text id PK
+        text studentId FK
+        text date
+        text scanValue
+    }
 
-    Student --> StudentLeave
-    Student --> SdqAssessments
-    Parent --> SdqAssessments
+    LEAVE_REQUESTS {
+        text id PK
+        text studentId FK
+        text requestedBy FK
+        text status
+    }
 
-    Users --> Teachers
-    Teachers --> Students
-    Students --> Attendance
-    Students --> Late
-    Students --> Leave
-    Students --> StudentLeave
-    Students --> BehaviorLogs
-    Students --> SdqAssessments
+    STUDENT_LEAVE_REQUESTS {
+        text id PK
+        text studentId FK
+        text date
+        text leaveType
+        text attendanceRecordId FK
+    }
 
-    ScoreRules --> BehaviorLogs
-    SdqPeriods --> SdqAssessments
-    SdqAssessments --> SdqAnswers
-    SdqAssessments --> SdqScores
-    Years --> Attendance
-    Years --> SdqPeriods
-    Holidays --> Attendance
+    SCORE_RULES {
+        text id PK
+        text name
+        text type
+        int points
+    }
+
+    BEHAVIOR_LOGS {
+        text id PK
+        text studentId FK
+        text ruleId FK
+        text performedBy FK
+        int scoreChange
+    }
+
+    ACADEMIC_YEARS {
+        text id PK
+        text name
+        int isActive
+    }
+
+    SPECIAL_HOLIDAYS {
+        text id PK
+        text date
+        text name
+    }
+
+    SDQ_PERIODS {
+        text id PK
+        text academicYearId FK
+        text name
+        text term
+    }
+
+    SDQ_ASSESSMENTS {
+        text id PK
+        text studentId FK
+        text periodId FK
+        text evaluatorType
+        text evaluatorUserId FK
+    }
+
+    SDQ_ANSWERS {
+        text id PK
+        text assessmentId FK
+        text questionCode
+        int answerValue
+    }
+
+    SDQ_SCORES {
+        text id PK
+        text assessmentId FK
+        int totalDifficulty
+        text interpretation
+    }
+
+    USERS ||--o| TEACHERS : "เชื่อมบัญชีครู"
+    TEACHER_DIRECTORY ||--o{ TEACHER_REGISTRATION_REQUESTS : "เปิดรับคำขอลงทะเบียน"
+    TEACHER_DIRECTORY ||--o| USERS : "อ้างถึงบัญชีที่สร้างแล้ว"
+    TEACHER_DIRECTORY ||--o| TEACHERS : "อ้างถึงข้อมูลครูที่สร้างแล้ว"
+    TEACHER_REGISTRATION_REQUESTS ||--o| USERS : "สร้างบัญชีผู้ใช้"
+    TEACHER_REGISTRATION_REQUESTS ||--o| TEACHERS : "สร้างข้อมูลครู"
+    TEACHERS ||--o{ STUDENTS : "ดูแลห้องเรียน"
+    STUDENTS ||--o{ ATTENDANCE : "มีประวัติเช็คชื่อ"
+    STUDENTS ||--o{ LATE_CHECKINS : "มีประวัติมาสาย"
+    STUDENTS ||--o{ LEAVE_REQUESTS : "มีคำขอออกนอกบริเวณ"
+    STUDENTS ||--o{ STUDENT_LEAVE_REQUESTS : "ยื่นใบลา"
+    STUDENTS ||--o{ BEHAVIOR_LOGS : "มีประวัติพฤติกรรม"
+    STUDENTS ||--o{ SDQ_ASSESSMENTS : "ถูกประเมิน SDQ"
+    SCORE_RULES ||--o{ BEHAVIOR_LOGS : "อ้างอิงกฎคะแนน"
+    ATTENDANCE ||--o| STUDENT_LEAVE_REQUESTS : "เชื่อมใบลาที่ถูกใช้"
+    LATE_CHECKINS ||--o| ATTENDANCE : "อ้างถึงการมาสาย"
+    ACADEMIC_YEARS ||--o{ SDQ_PERIODS : "กำหนดรอบประเมิน"
+    SDQ_PERIODS ||--o{ SDQ_ASSESSMENTS : "ครอบคลุมรายการประเมิน"
+    SDQ_ASSESSMENTS ||--o{ SDQ_ANSWERS : "มีคำตอบรายข้อ"
+    SDQ_ASSESSMENTS ||--|| SDQ_SCORES : "มีคะแนนสรุป"
 ```
+
+หมายเหตุ:
+
+- แผนภาพนี้แสดงความสัมพันธ์เชิงแนวคิดของตารางหลักตาม `schema.sql` โดยย่อ เพื่อใช้อธิบายภาพรวมของข้อมูลในระบบ
+- ตาราง `special_holidays` ทำหน้าที่เป็นข้อมูลอ้างอิงด้านปฏิทินสำหรับการคำนวณวันเรียน จึงไม่ได้เชื่อมแบบรายคนกับนักเรียนโดยตรง
 
 ### 🔄 6.1.2 ภาพรวมสถาปัตยกรรมการไหลข้อมูล
 
 ```mermaid
 flowchart LR
-    UI["หน้าจอผู้ใช้<br/>Dashboard / Student Portal / Public Pages"]
-    Middleware["Authentication / Route Protection"]
-    API["Route Handlers"]
-    Service["Domain Services<br/>attendance / behavior / leave / sdq / auth"]
-    Query["Data Access Layer"]
-    D1["Cloudflare D1"]
-    Output["ผลลัพธ์ที่แสดงบนหน้าจอ<br/>ตาราง / การ์ด / รายงาน / สถานะ"]
+    UI["ช่องทางใช้งาน<br/>Dashboard / Student Portal / Public Pages"]
+    Auth["การตรวจสอบสิทธิ์<br/>Session Cookie / Middleware"]
+    API["API Layer<br/>ตรวจรับคำขอและตอบกลับ"]
+    Service["Service Layer<br/>Auth / Attendance / Leave / Behavior / SDQ"]
+    DB[("Cloudflare D1")]
+    Result["ผลลัพธ์<br/>ตาราง / การ์ด / รายงาน / สถานะ"]
 
-    UI --> Middleware
-    Middleware --> API
+    UI --> Auth
+    Auth --> API
     API --> Service
-    Service --> Query
-    Query --> D1
-    D1 --> Query
-    Query --> Service
+    Service --> DB
+    DB --> Service
     Service --> API
-    API --> Output
-    Output --> UI
+    API --> Result
+    Result --> UI
 ```
 
 ### 🔩 6.2 ส่วนประกอบหลัก
